@@ -376,3 +376,101 @@ def build_analyzable_metrics(df: pd.DataFrame, roles: FieldRoles) -> list[dict[s
             }
         )
     return metrics
+
+
+def build_time_feature_frame(df: pd.DataFrame, time_column: str | None) -> pd.DataFrame:
+    """Create reusable time features for peak and weekday/weekend analysis."""
+    if not time_column or time_column not in df.columns:
+        return pd.DataFrame()
+    time_df = df.dropna(subset=[time_column]).copy()
+    if time_df.empty:
+        return pd.DataFrame()
+    time_df["_date"] = time_df[time_column].dt.date
+    time_df["_weekday"] = time_df[time_column].dt.day_name()
+    time_df["_is_weekend"] = time_df[time_column].dt.dayofweek >= 5
+    time_df["_hour"] = time_df[time_column].dt.hour
+    time_df["_time_band"] = pd.cut(
+        time_df["_hour"],
+        bins=[-1, 5, 9, 12, 17, 21, 24],
+        labels=["凌晨", "早高峰", "上午", "下午", "晚高峰", "夜间"],
+        include_lowest=True,
+    )
+    return time_df
+
+
+def summarize_peak_periods(df: pd.DataFrame, roles: FieldRoles, metric_column: str | None) -> list[dict[str, Any]]:
+    """Summarize peak time bands for one metric."""
+    if not metric_column or metric_column not in df.columns:
+        return []
+    time_df = build_time_feature_frame(df, roles.time_column)
+    if time_df.empty or "_time_band" not in time_df.columns:
+        return []
+    grouped = (
+        time_df.groupby("_time_band", dropna=True)[metric_column]
+        .mean()
+        .reset_index()
+        .sort_values(metric_column, ascending=False)
+    )
+    if grouped.empty:
+        return []
+    top_band = grouped.iloc[0]["_time_band"]
+    top_value = grouped.iloc[0][metric_column]
+    return [
+        {
+            "time_band": str(row["_time_band"]),
+            "value": float(row[metric_column]),
+            "is_peak": bool(row["_time_band"] == top_band),
+        }
+        for _, row in grouped.head(6).iterrows()
+    ]
+
+
+def compare_weekday_weekend(df: pd.DataFrame, roles: FieldRoles, metric_column: str | None) -> dict[str, Any]:
+    """Compare weekday and weekend performance for one metric."""
+    if not metric_column or metric_column not in df.columns:
+        return {}
+    time_df = build_time_feature_frame(df, roles.time_column)
+    if time_df.empty:
+        return {}
+    grouped = time_df.groupby("_is_weekend")[metric_column].mean()
+    if grouped.empty:
+        return {}
+    weekday_value = float(grouped.get(False, float("nan")))
+    weekend_value = float(grouped.get(True, float("nan")))
+    diff = weekend_value - weekday_value
+    base = weekday_value if weekday_value not in (0, None) else 0.0
+    pct = None if base == 0 else diff / base
+    return {
+        "weekday_avg": weekday_value,
+        "weekend_avg": weekend_value,
+        "difference": diff,
+        "difference_pct": pct,
+    }
+
+
+def build_metric_change_explanations(df: pd.DataFrame, roles: FieldRoles, metric_columns: list[str]) -> list[dict[str, Any]]:
+    """Build natural-language style change explanations for the top metrics."""
+    time_df = build_time_feature_frame(df, roles.time_column)
+    if time_df.empty:
+        return []
+    explanations: list[dict[str, Any]] = []
+    top_metrics = [column for column in metric_columns if column in time_df.columns][:3]
+    for metric in top_metrics:
+        trend_by_day = time_df.groupby("_date")[metric].mean().sort_index()
+        if trend_by_day.shape[0] < 2:
+            continue
+        first_value = float(trend_by_day.iloc[0])
+        last_value = float(trend_by_day.iloc[-1])
+        delta = last_value - first_value
+        direction = "上升" if delta > 0 else "下降" if delta < 0 else "持平"
+        explanations.append(
+            {
+                "metric": metric,
+                "start_value": first_value,
+                "end_value": last_value,
+                "change": delta,
+                "direction": direction,
+                "explanation": f"{metric} 从 {first_value:.2f} 变化到 {last_value:.2f}，整体{direction} {abs(delta):.2f}。",
+            }
+        )
+    return explanations

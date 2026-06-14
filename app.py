@@ -35,7 +35,15 @@ from src.visualization import (
     create_region_comparison_chart,
     create_time_trend_chart,
 )
-from style import apply_global_styles, render_hero, render_suggestion_card
+from style import (
+    apply_global_styles,
+    render_hero,
+    render_info_cards,
+    render_prompt_cards,
+    render_section_banner,
+    render_suggestion_card,
+    render_workflow_cards,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -86,8 +94,8 @@ def build_role_overrides(default_roles: FieldRoles, columns: list[str]) -> dict[
     }
 
 
-def render_metric_cards(kpis: dict[str, Any]) -> None:
-    """Render top-level KPI cards for the dashboard."""
+def render_kpi_cards(kpis: dict[str, Any]) -> None:
+    """Render high-level KPI cards."""
     cards = st.columns(4)
     cards[0].metric("记录数", f"{kpis.get('row_count', 0):,}")
     cards[1].metric("字段数", f"{kpis.get('column_count', 0):,}")
@@ -115,43 +123,129 @@ def render_agent_payload(agent_title: str, input_summary: dict[str, Any], output
             st.json(output_summary)
 
 
-def render_notes(notes: list[str]) -> None:
-    """Render agent notes as a compact bullet list."""
+def render_metric_table(notes: list[str]) -> None:
+    """Render notes as bullet list."""
     if not notes:
         return
     for note in notes:
         st.write(f"- {note}")
 
 
-def render_value_judgement_cards(df: pd.DataFrame) -> None:
-    """Render product suggestion value judgement as cards."""
-    if df.empty:
-        return
-    st.dataframe(df, use_container_width=True)
+def render_positioning_section() -> None:
+    """Render product positioning cards."""
+    render_section_banner("产品定位", "面向城市交通、出行平台与智慧交通产品团队的 AI 数据产品 Demo。")
+    render_info_cards(
+        [
+            {"title": "目标用户", "body": "交通管理部门、出行平台运营、智慧交通产品团队。"},
+            {"title": "用户痛点", "body": "交通数据分散、人工分析耗时、报告输出不稳定、缺少可执行建议。"},
+            {"title": "产品价值", "body": "从数据上传到洞察生成再到产品建议，缩短分析和决策链路。"},
+        ]
+    )
+
+
+def render_workflow_section() -> None:
+    """Render a four-step agent workflow."""
+    render_section_banner("Agent 工作流展示", "把复杂分析过程拆成可解释、可展示、可追问的四步。")
+    render_workflow_cards(
+        [
+            {
+                "title": "数据识别 Agent",
+                "input": "上传 CSV、字段名、样本数据",
+                "process": "自动识别时间列、区域列、数值列，完成清洗与质量检查。",
+                "output": "字段角色、可分析指标、数据质量摘要。",
+            },
+            {
+                "title": "交通指标分析 Agent",
+                "input": "清洗后的数据、分析指标",
+                "process": "计算高峰时段、排名、异常波动、工作日/周末差异和指标变化解释。",
+                "output": "趋势表、排名表、异常点、相关性与对比结果。",
+            },
+            {
+                "title": "业务洞察 Agent",
+                "input": "分析结果、KPI、异常和相关性",
+                "process": "把数值结果翻译为现象、原因、影响和下一步建议。",
+                "output": "执行摘要、洞察卡片、行动建议、分析限制。",
+            },
+            {
+                "title": "产品建议 Agent",
+                "input": "业务洞察、分析结果、数据质量",
+                "process": "生成交通治理、出行平台运营、数据产品优化建议。",
+                "output": "产品建议卡片、价值判断、影响指标、简历描述。",
+            },
+        ]
+    )
+
+
+def render_prompt_section() -> None:
+    """Render prompt engineering cards."""
+    render_section_banner("Prompt 设计展示", "强调结构化输出、角色分工和业务导向，而不是堆砌分析术语。")
+    render_prompt_cards(
+        [
+            {
+                "title": "data_profiler_agent Prompt",
+                "body": "识别字段角色、数据质量和可分析指标，并输出结构化 JSON，方便下游 Agent 继续处理。",
+            },
+            {
+                "title": "analysis_agent Prompt",
+                "body": "从趋势、排名、异常、相关性和高峰时段中提炼交通现象，并给出工作日/周末差异。",
+            },
+            {
+                "title": "insight / suggestion Prompt",
+                "body": "把分析结果转成业务语言，明确现象、影响、行动建议和价值判断，面向面试表达。",
+            },
+        ]
+    )
+
+
+def render_value_section() -> None:
+    """Render product value cards."""
+    render_section_banner("产品价值说明", "用同一套工作流同时服务交通治理、平台运营和数据产品建设。")
+    render_info_cards(
+        [
+            {"title": "Agent Workflow", "body": "让上传、识别、分析、洞察、建议、报告形成连续链路。"},
+            {"title": "Prompt Engineering", "body": "用结构化提示词确保输出稳定，可读、可演示、可复用。"},
+            {"title": "业务价值", "body": "缩短报告生成时间，提高异常识别效率和运营决策效率。"},
+        ]
+    )
 
 
 def render_profiler_section(agent_input: DataProfilerInput, output) -> None:
-    """Render data_profiler_agent output for portfolio demonstration."""
-    st.subheader("数据概览区")
+    """Render data_profiler_agent output."""
+    render_section_banner("数据概览区", "看字段、看质量、看可分析指标。")
     render_agent_payload("data_profiler_agent", agent_input.summary(), output.summary())
 
-    left, right = st.columns([1.2, 0.8])
-    with left:
-        st.markdown("**字段预览**")
-        st.dataframe(output.column_profile, use_container_width=True)
-    with right:
-        st.markdown("**可分析指标**")
-        st.dataframe(pd.DataFrame(output.analyzable_metrics), use_container_width=True)
-        render_notes(output.notes)
-        st.markdown("**清洗结果**")
-        st.dataframe(output.cleaned_df.head(12), use_container_width=True)
+    tab_fields, tab_metrics, tab_cleaning = st.tabs(["字段预览", "可分析指标", "清洗结果"])
+    with tab_fields:
+        field_profile = output.column_profile.copy()
+        if "field_name" not in field_profile.columns:
+            field_profile.insert(0, "field_name", field_profile.index.astype(str))
+        display_columns = [column for column in ["field_name", "column_type", "is_analyzable", "recommended_use"] if column in field_profile.columns]
+        st.dataframe(field_profile[display_columns] if display_columns else field_profile, use_container_width=True, hide_index=True)
+    with tab_metrics:
+        metric_df = pd.DataFrame(output.analyzable_metrics)
+        if metric_df.empty:
+            st.info("当前数据未识别到可分析指标。")
+        else:
+            metric_display_cols = [column for column in ["field_name", "label", "role", "aggregation", "mean", "min", "max"] if column in metric_df.columns]
+            st.dataframe(metric_df[metric_display_cols] if metric_display_cols else metric_df, use_container_width=True, hide_index=True)
+            st.caption("系统会优先识别流量、拥堵指数、事故数、速度、订单数等指标字段。")
+    with tab_cleaning:
+        quality = output.quality_summary
+        c1, c2, c3 = st.columns(3)
+        c1.metric("数据行数", f"{len(output.cleaned_df):,}")
+        c2.metric("字段数", f"{len(output.cleaned_df.columns):,}")
+        c3.metric("缺失值数量", f"{quality.get('missing_total', 0):,}")
+        c4, c5, c6 = st.columns(3)
+        c4.metric("重复值数量", f"{quality.get('duplicate_rows', 0):,}")
+        c5.metric("日期范围", quality.get("time_range", "未识别"))
+        c6.metric("清洗状态", quality.get("status", "已完成"))
 
 
 def render_analysis_section(agent_input: AnalysisInput, output) -> None:
-    """Render analysis_agent output and quantitative tables."""
-    st.subheader("核心指标区")
+    """Render analysis_agent output."""
+    render_section_banner("核心指标区", "把分析结果沉淀成可汇报的 KPI 和表格。")
     render_agent_payload("analysis_agent", agent_input.summary(), output.summary())
-    render_metric_cards(output.kpis)
+    render_kpi_cards(output.kpis)
     if output.kpis.get("time_range"):
         st.caption(f"时间范围：{output.kpis['time_range']}")
 
@@ -172,7 +266,7 @@ def render_analysis_section(agent_input: AnalysisInput, output) -> None:
 
 def render_chart_section(profiler_output, analysis_output, selected_metrics: list[str], primary_metric: str | None) -> None:
     """Render Plotly charts derived from the structured agent outputs."""
-    st.subheader("图表分析区")
+    render_section_banner("图表分析区", "保留业务人员最关注的趋势、区域对比和异常点。")
     chart_tab1, chart_tab2, chart_tab3, chart_tab4 = st.tabs(["趋势图", "区域对比图", "异常点图", "分布图"])
     with chart_tab1:
         st.plotly_chart(create_time_trend_chart(profiler_output.cleaned_df, profiler_output.roles, selected_metrics), use_container_width=True)
@@ -185,10 +279,9 @@ def render_chart_section(profiler_output, analysis_output, selected_metrics: lis
 
 
 def render_insight_section(agent_input: InsightInput, output) -> None:
-    """Render insight_agent output as business insight cards and structured JSON."""
-    st.subheader("AI 洞察报告区")
+    """Render insight_agent output."""
+    render_section_banner("AI 洞察报告区", "把数值结果翻译为现象、原因、影响和下一步建议。")
     render_agent_payload("insight_agent", agent_input.summary(), output.summary())
-
     st.markdown('<div class="section-label">执行摘要</div>', unsafe_allow_html=True)
     st.info(output.executive_summary)
 
@@ -220,9 +313,8 @@ def render_insight_section(agent_input: InsightInput, output) -> None:
 
 def render_product_suggestion_section(agent_input: ProductSuggestionInput, output) -> None:
     """Render PM-style product suggestions and value judgement."""
-    st.subheader("产品建议与价值判断区")
+    render_section_banner("产品建议与价值判断区", "输出可直接用于面试和作品集展示的产品建议。")
     render_agent_payload("product_suggestion_agent", agent_input.summary(), output.summary())
-
     st.markdown("**产品建议卡片**")
     for suggestion in output.suggestions:
         render_suggestion_card(
@@ -236,14 +328,14 @@ def render_product_suggestion_section(agent_input: ProductSuggestionInput, outpu
             evidence=suggestion.evidence,
         )
     st.markdown("**价值判断总览**")
-    render_value_judgement_cards(pd.DataFrame(output.value_judgements))
+    st.dataframe(pd.DataFrame(output.value_judgements), use_container_width=True)
     st.markdown("**简历项目描述区**")
     st.info(output.resume_project_description)
 
 
 def render_report_section(agent_input: ReportInput, output) -> None:
     """Render report_agent input, output, Markdown report, and download control."""
-    st.subheader("报告输出")
+    render_section_banner("报告输出", "生成可下载的 Markdown 报告，适合作品集交付页。")
     render_agent_payload("report_agent", agent_input.summary(), output.summary())
     if output.error:
         st.warning(f"LLM 调用失败，已回退到本地报告：{output.error}")
@@ -277,7 +369,12 @@ def main() -> None:
     apply_global_styles()
     render_hero()
 
-    st.markdown('<div class="section-title">数据上传区</div>', unsafe_allow_html=True)
+    render_positioning_section()
+    render_workflow_section()
+    render_prompt_section()
+    render_value_section()
+
+    render_section_banner("数据上传区", "上传 CSV 或直接使用示例数据。")
     upload_col, sample_col = st.columns([2, 1])
     with upload_col:
         uploaded_file = st.file_uploader("上传 CSV 文件", type=["csv"])
@@ -320,13 +417,9 @@ def main() -> None:
     )
     product_suggestion_output = product_suggestion_agent.run(product_suggestion_input)
 
-    st.markdown('<div class="section-title">数据概览区</div>', unsafe_allow_html=True)
     render_profiler_section(profiler_input, profiler_output)
-
-    st.markdown('<div class="section-title">核心指标区</div>', unsafe_allow_html=True)
     render_analysis_section(analysis_input, analysis_output)
     render_chart_section(profiler_output, analysis_output, selected_metrics, primary_metric)
-
     render_insight_section(insight_input, insight_output)
     render_product_suggestion_section(product_suggestion_input, product_suggestion_output)
 

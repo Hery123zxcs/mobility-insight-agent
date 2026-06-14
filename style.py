@@ -95,6 +95,13 @@ def apply_global_styles() -> None:
                 border-left: 4px solid var(--primary);
             }
 
+            .section-subtitle {
+                color: var(--muted);
+                font-size: 0.92rem;
+                margin: -2px 0 12px 8px;
+                line-height: 1.55;
+            }
+
             .section-label {
                 font-size: 0.92rem;
                 font-weight: 700;
@@ -199,6 +206,108 @@ def apply_global_styles() -> None:
                 align-items: center;
             }
 
+            .info-grid,
+            .workflow-grid {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 14px;
+            }
+
+            .workflow-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+
+            @media (max-width: 1100px) {
+                .info-grid,
+                .workflow-grid {
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
+            }
+
+            @media (max-width: 700px) {
+                .info-grid,
+                .workflow-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            .info-card,
+            .workflow-card,
+            .prompt-card,
+            .interview-card,
+            .data-tab-card {
+                background: var(--panel);
+                border: 1px solid var(--border);
+                border-radius: 16px;
+                padding: 16px;
+                box-shadow: var(--shadow);
+                height: 100%;
+            }
+
+            .info-card-title,
+            .workflow-card-title,
+            .prompt-card-title,
+            .interview-card-title,
+            .data-tab-card-title {
+                font-weight: 700;
+                color: var(--text);
+                margin-bottom: 8px;
+                font-size: 0.98rem;
+            }
+
+            .info-card-body,
+            .workflow-card-body,
+            .prompt-card-body,
+            .interview-card-body,
+            .data-tab-card-body {
+                color: var(--text);
+                font-size: 0.92rem;
+                line-height: 1.7;
+            }
+
+            .data-tab-card {
+                margin-bottom: 12px;
+            }
+
+            .data-tab-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 12px;
+            }
+
+            @media (max-width: 900px) {
+                .data-tab-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            .data-tab-kpi {
+                background: var(--panel-soft);
+                border: 1px solid var(--border);
+                border-radius: 14px;
+                padding: 12px 14px;
+            }
+
+            .data-tab-kpi-label {
+                color: var(--muted);
+                font-size: 0.8rem;
+                margin-bottom: 4px;
+            }
+
+            .data-tab-kpi-value {
+                color: var(--text);
+                font-size: 1rem;
+                font-weight: 700;
+            }
+
+            .workflow-arrow {
+                text-align: center;
+                color: var(--primary);
+                font-size: 1.2rem;
+                font-weight: 700;
+                margin: 6px 0;
+            }
+
             .suggestion-tag,
             .suggestion-pill {
                 display: inline-flex;
@@ -264,6 +373,85 @@ def render_hero() -> None:
                 <span class="tag">Agent 工作流</span>
                 <span class="tag">产品建议与价值判断</span>
             </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_section_banner(title: str, subtitle: str | None = None) -> None:
+    """Render a small section banner used across the demo."""
+    subtitle_html = f'<div class="section-subtitle">{subtitle}</div>' if subtitle else ""
+    st.markdown(
+        f"""
+        <div class="section-title">{title}</div>
+        {subtitle_html}
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_info_cards(items: list[dict[str, str]]) -> None:
+    """Render a compact info grid for product positioning and value."""
+    st.markdown('<div class="info-grid">', unsafe_allow_html=True)
+    cols = st.columns(min(3, max(1, len(items))))
+    for index, item in enumerate(items):
+        with cols[index % len(cols)]:
+            st.markdown(
+                f"""
+                <div class="info-card">
+                    <div class="info-card-title">{item.get('title', '')}</div>
+                    <div class="info-card-body">{item.get('body', '')}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+def render_workflow_cards(steps: list[dict[str, str]]) -> None:
+    """Render four-step agent workflow cards."""
+    cols = st.columns(min(4, max(1, len(steps))))
+    for index, step in enumerate(steps):
+        with cols[index % len(cols)]:
+            st.markdown(
+                f"""
+                <div class="workflow-card">
+                    <div class="workflow-card-title">{step.get('title', '')}</div>
+                    <div class="workflow-card-body"><strong>输入：</strong>{step.get('input', '')}</div>
+                    <div class="workflow-card-body"><strong>处理：</strong>{step.get('process', '')}</div>
+                    <div class="workflow-card-body"><strong>输出：</strong>{step.get('output', '')}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        if index < len(steps) - 1:
+            st.markdown('<div class="workflow-arrow">↓</div>', unsafe_allow_html=True)
+
+
+def render_prompt_cards(prompts: list[dict[str, str]]) -> None:
+    """Render prompt design cards."""
+    cols = st.columns(min(3, max(1, len(prompts))))
+    for index, prompt in enumerate(prompts):
+        with cols[index % len(cols)]:
+            st.markdown(
+                f"""
+                <div class="prompt-card">
+                    <div class="prompt-card-title">{prompt.get('title', '')}</div>
+                    <div class="prompt-card-body">{prompt.get('body', '')}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
+def render_interview_card(title: str, body: str) -> None:
+    """Render an interview coaching card."""
+    st.markdown(
+        f"""
+        <div class="interview-card">
+            <div class="interview-card-title">{title}</div>
+            <div class="interview-card-body">{body}</div>
         </div>
         """,
         unsafe_allow_html=True,

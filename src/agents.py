@@ -22,11 +22,15 @@ from src.data_processing import (
     apply_role_overrides,
     build_analyzable_metrics,
     build_column_profile,
+    build_metric_change_explanations,
+    build_time_feature_frame,
     clean_data,
     compute_kpis,
+    compare_weekday_weekend,
     detect_anomalies,
     infer_field_roles,
     metric_aggregation,
+    summarize_peak_periods,
 )
 
 
@@ -183,6 +187,9 @@ class AnalysisOutput:
     correlation_matrix: pd.DataFrame
     correlation_pairs: list[dict[str, Any]]
     metric_summary: list[dict[str, Any]]
+    peak_periods: list[dict[str, Any]]
+    weekday_weekend_comparison: dict[str, Any]
+    change_explanations: list[dict[str, Any]]
     notes: list[str]
 
     def summary(self) -> dict[str, Any]:
@@ -195,6 +202,9 @@ class AnalysisOutput:
             "anomaly_count": int(len(self.anomalies)),
             "correlation_pairs": self.correlation_pairs,
             "metric_summary": self.metric_summary,
+            "peak_periods": self.peak_periods,
+            "weekday_weekend_comparison": self.weekday_weekend_comparison,
+            "change_explanations": self.change_explanations,
             "notes": self.notes,
         }
 
@@ -218,6 +228,9 @@ class AnalysisAgent:
         correlation_matrix = self._build_correlation_matrix(df, roles.numeric_columns)
         correlation_pairs = self._build_correlation_pairs(correlation_matrix)
         metric_summary = self._build_metric_summary(df, roles.numeric_columns)
+        peak_periods = self._build_peak_periods(df, roles, primary_metric or (metrics[0] if metrics else None))
+        weekday_weekend_comparison = self._build_weekday_weekend_comparison(df, roles, primary_metric or (metrics[0] if metrics else None))
+        change_explanations = self._build_change_explanations(df, roles, metrics)
         notes = self._build_notes(trend_table, ranking_table, anomalies, correlation_pairs)
 
         return AnalysisOutput(
@@ -229,6 +242,9 @@ class AnalysisAgent:
             correlation_matrix=correlation_matrix,
             correlation_pairs=correlation_pairs,
             metric_summary=metric_summary,
+            peak_periods=peak_periods,
+            weekday_weekend_comparison=weekday_weekend_comparison,
+            change_explanations=change_explanations,
             notes=notes,
         )
 
@@ -295,6 +311,22 @@ class AnalysisAgent:
                 }
             )
         return rows
+
+    def _build_peak_periods(self, df: pd.DataFrame, roles: FieldRoles, metric: str | None) -> list[dict[str, Any]]:
+        """Summarize peak time bands for the main metric."""
+        if not metric:
+            return []
+        return summarize_peak_periods(df, roles, metric)
+
+    def _build_weekday_weekend_comparison(self, df: pd.DataFrame, roles: FieldRoles, metric: str | None) -> dict[str, Any]:
+        """Compare weekday and weekend performance for the main metric."""
+        if not metric:
+            return {}
+        return compare_weekday_weekend(df, roles, metric)
+
+    def _build_change_explanations(self, df: pd.DataFrame, roles: FieldRoles, metrics: list[str]) -> list[dict[str, Any]]:
+        """Build simple change explanations for the top metrics."""
+        return build_metric_change_explanations(df, roles, metrics)
 
     def _build_notes(
         self,
@@ -390,6 +422,29 @@ class InsightAgent:
     def _build_insights(self, profiler: DataProfilerOutput, analysis: AnalysisOutput) -> list[InsightItem]:
         """Build structured insight cards from analysis evidence."""
         insights: list[InsightItem] = []
+        if analysis.peak_periods:
+            top_peak = analysis.peak_periods[0]
+            insights.append(
+                InsightItem(
+                    title="识别到高峰时段",
+                    evidence=f"{top_peak['time_band']} 是当前样本中表现最突出的时段之一。".replace("之一", "的核心高峰时段"),
+                    implication="说明出行需求在特定时段显著集中，适合结合运力调度、信号配时和诱导策略做优化。",
+                    priority="high",
+                )
+            )
+        if analysis.weekday_weekend_comparison:
+            diff = analysis.weekday_weekend_comparison.get("difference", 0)
+            weekday_avg = analysis.weekday_weekend_comparison.get("weekday_avg")
+            weekend_avg = analysis.weekday_weekend_comparison.get("weekend_avg")
+            direction = "更高" if diff > 0 else "更低" if diff < 0 else "接近"
+            insights.append(
+                InsightItem(
+                    title="工作日与周末存在差异",
+                    evidence=f"工作日均值 {weekday_avg:.2f}，周末均值 {weekend_avg:.2f}，周末相对工作日{direction}。".replace("周末相对工作日接近。", "两者差异不明显。"),
+                    implication="这通常意味着出行结构在周内存在明显变化，运营或治理策略不应使用单一规则。",
+                    priority="medium",
+                )
+            )
         if not analysis.ranking_table.empty:
             top_row = analysis.ranking_table.iloc[0]
             region_column = profiler.roles.region_column
@@ -422,6 +477,16 @@ class InsightAgent:
                     title="指标之间存在联动关系",
                     evidence=f"{pair['metric_a']} 与 {pair['metric_b']} 的相关系数为 {pair['correlation']:.2f}。",
                     implication="可将这组指标作为联合监控对象，提升预警解释力。",
+                    priority="medium",
+                )
+            )
+        if analysis.change_explanations:
+            explanation = analysis.change_explanations[0]
+            insights.append(
+                InsightItem(
+                    title="指标变化可以被解释",
+                    evidence=explanation["explanation"],
+                    implication="这类变化解释可以直接进入运营日报和面试演示，帮助说明数据结果背后的业务含义。",
                     priority="medium",
                 )
             )
