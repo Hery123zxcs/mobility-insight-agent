@@ -389,41 +389,19 @@ def render_insight_section(output) -> None:
 def render_product_suggestion_section(output) -> None:
     """Render six product suggestion cards."""
     render_section_banner("产品建议", "6 张建议卡片。")
-    st.markdown(
-        """
-        <style>
-            .suggestion-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
-            @media (max-width: 900px){.suggestion-grid{grid-template-columns:1fr;}}
-            .suggestion-card{background:#fff;border:1px solid #dbe3ee;border-radius:16px;box-shadow:0 10px 28px rgba(16,32,51,.08);padding:14px;height:100%;}
-            .suggestion-meta-row{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;}
-            .suggestion-title{font-size:.98rem;font-weight:800;color:#102033;margin-bottom:8px;}
-            .suggestion-body{color:#102033;font-size:.9rem;line-height:1.6;margin-bottom:8px;}
-            .pill{display:inline-flex;border-radius:999px;padding:4px 10px;font-size:.75rem;font-weight:800;background:#eef3fb;color:#40536b;}
-            .pill-high{background:#eaf1ff;color:#1f5eff;}
-            .pill-low{background:#f2f5f8;color:#6d7c90;}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    cards = []
-    for suggestion in output.suggestions:
-        cards.append(
-            f"""
-            <div class="suggestion-card">
-                <div class="suggestion-meta-row">
-                    <span class="pill">{suggestion.category}</span>
-                    <span class="pill {'pill-high' if suggestion.priority == 'high' else ''}">{suggestion.priority.title()}</span>
-                    <span class="pill">{suggestion.effort.title()}</span>
-                </div>
-                <div class="suggestion-title">{suggestion.title}</div>
-                <div class="suggestion-body"><b>面向角色：</b>{suggestion.category}</div>
-                <div class="suggestion-body"><b>数据证据：</b>{suggestion.evidence}</div>
-                <div class="suggestion-body"><b>产品价值：</b>{suggestion.value_judgement}</div>
-                <div class="suggestion-body"><b>影响指标：</b>{' / '.join(suggestion.impact_metrics)}</div>
-            </div>
-            """
-        )
-    st.markdown(f"<div class='suggestion-grid'>{''.join(cards)}</div>", unsafe_allow_html=True)
+    cols = st.columns(2)
+    for index, suggestion in enumerate(output.suggestions):
+        with cols[index % 2]:
+            render_suggestion_card(
+                category=suggestion.category,
+                title=suggestion.title,
+                recommendation=suggestion.recommendation,
+                value_judgement=suggestion.value_judgement,
+                impact_metrics=suggestion.impact_metrics,
+                priority=suggestion.priority,
+                effort=suggestion.effort,
+                evidence=suggestion.evidence,
+            )
 
 
 def choose_analysis_metrics(numeric_columns: list[str]) -> tuple[list[str], str | None]:
