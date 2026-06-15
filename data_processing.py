@@ -342,11 +342,11 @@ def build_column_profile(df: pd.DataFrame, roles: FieldRoles) -> pd.DataFrame:
     for column in df.columns:
         rows.append(
             {
-                "字段名": column,
-                "推断类型": roles.column_types.get(column, "unknown"),
-                "缺失值": int(df[column].isna().sum()),
-                "唯一值": int(df[column].nunique(dropna=True)),
-                "自动识别角色": " / ".join(role_by_column[column]) if role_by_column[column] else "-",
+                "field_name": column,
+                "field_type": roles.column_types.get(column, "unknown"),
+                "analysis_role": " / ".join(role_by_column[column]) if role_by_column[column] else "-",
+                "is_analyzable": bool(column in roles.numeric_columns or column == roles.time_column or column == roles.region_column),
+                "recommended_use": "趋势分析 / 高峰识别" if column == roles.time_column else "区域对比 / 排名分析" if column == roles.region_column else "通用指标分析" if column in roles.numeric_columns else "基础字段查看 / 数据理解",
             }
         )
     return pd.DataFrame(rows)
@@ -356,17 +356,20 @@ def build_analyzable_metrics(df: pd.DataFrame, roles: FieldRoles) -> list[dict[s
     """Describe numeric metrics that can be used by downstream analysis agents."""
     metrics: list[dict[str, Any]] = []
     semantic_roles = {
-        roles.congestion_column: "congestion",
-        roles.passenger_column: "passenger_flow",
-        roles.accident_column: "accident",
+        roles.congestion_column: ("拥堵指数", "拥堵分析 / 预警"),
+        roles.passenger_column: ("客流量", "流量分析 / 运营监控"),
+        roles.accident_column: ("事故数", "安全分析 / 风险监控"),
     }
     for column in roles.numeric_columns:
         if column not in df.columns:
             continue
+        metric_name, analysis_use = semantic_roles.get(column, (column, "通用指标分析"))
         metrics.append(
             {
-                "column": column,
-                "semantic_role": semantic_roles.get(column, "numeric_metric"),
+                "field_name": column,
+                "metric_name": metric_name,
+                "metric_type": roles.column_types.get(column, "numeric"),
+                "analysis_use": analysis_use,
                 "aggregation": metric_aggregation(column, roles),
                 "non_null_count": int(df[column].notna().sum()),
                 "missing_count": int(df[column].isna().sum()),
